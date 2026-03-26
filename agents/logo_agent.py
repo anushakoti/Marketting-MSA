@@ -3,11 +3,14 @@ import json
 import logging
 import random
 import boto3
+from pathlib import Path
 from botocore.exceptions import ClientError
 from langchain_core.tools import tool
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+LOGO_DIR = Path("logos")
 
 class ImageError(Exception):
     """Custom exception for errors returned by Amazon Titan Image Generator V2."""
@@ -53,7 +56,11 @@ def generate_logo(business_name: str) -> str:
     })
     try:
         image_bytes = _generate_image(body)
-        output_path = "logo.png"
+        LOGO_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = random.randint(1000, 9999)
+        output_path = LOGO_DIR / f"{timestamp}_{unique_id}.png"
+ 
         with open(output_path, "wb") as f:
             f.write(image_bytes)
         logger.info("Successfully generated logo for %s", business_name)
