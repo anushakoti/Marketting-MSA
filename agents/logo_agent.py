@@ -7,10 +7,12 @@ from pathlib import Path
 from botocore.exceptions import ClientError
 from langchain_core.tools import tool
 from datetime import datetime
+from supabase_client import supabase_mgr
 
 logger = logging.getLogger(__name__)
 
-LOGO_DIR = Path("logos")
+# --- Supabase Storage Bucket ---
+LOGO_BUCKET = "assets"
 
 class ImageError(Exception):
     """Custom exception for errors returned by Amazon Titan Image Generator V2."""
@@ -56,15 +58,30 @@ def generate_logo(business_name: str) -> str:
     })
     try:
         image_bytes = _generate_image(body)
-        LOGO_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = random.randint(1000, 9999)
-        output_path = LOGO_DIR / f"{timestamp}_{unique_id}.png"
+        file_name = f"{timestamp}_{unique_id}.png"
+        file_path = f"logos/{file_name}"
  
-        with open(output_path, "wb") as f:
-            f.write(image_bytes)
-        logger.info("Successfully generated logo for %s", business_name)
-        return f"Logo generated successfully for {business_name}! The logo is saved to {output_path}."
+        try:
+            supabase_mgr.client.storage.from_(LOGO_BUCKET).upload(
+                path=file_path, 
+                file=image_bytes, 
+                file_options={"content-type": "image/png"}
+            )
+            
+            public_url = supabase_mgr.client.storage.from_(LOGO_BUCKET).get_public_url(file_path)
+            
+            logger.info("Successfully generated logo for %s and uploaded to Supabase", business_name)
+            return json.dumps({
+                "message": f"Logo generated successfully for {business_name}!",
+                "image_url": public_url,
+                "business_name": business_name
+            })
+        except Exception as e:
+            logger.error("Error uploading to Supabase: %s", str(e))
+            return f"Error uploading to cloud storage: {str(e)}"
+
     except (ClientError, ImageError) as e:
         msg = e.message if isinstance(e, ImageError) else e.response["Error"]["Message"]
         logger.error("Error generating logo: %s", msg)
