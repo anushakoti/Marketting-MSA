@@ -12,8 +12,19 @@ from supabase_client import supabase_mgr
 
 logger = logging.getLogger(__name__)
 
-if not os.environ.get("SUPABASE_URL") or not os.environ.get("SUPABASE_KEY"):
-    st.error("Supabase credentials not found. Please set `SUPABASE_URL` and `SUPABASE_KEY` in your `.env` file.")
+# --- Check Credentials ---
+def check_supabase_creds():
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        try:
+            url = url or st.secrets.get("SUPABASE_URL")
+            key = key or st.secrets.get("SUPABASE_KEY")
+        except: pass
+    return url and key
+
+if not check_supabase_creds():
+    st.error("Supabase credentials not found. Please set `SUPABASE_URL` and `SUPABASE_KEY` in your `.env` file or Streamlit secrets.")
     st.stop()
 
 st.set_page_config(
